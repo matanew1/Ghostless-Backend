@@ -18,6 +18,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is not set');
     }
+    // adapter roles as a bridge between Prisma Client and the underlying database driver (pg).
     const adapter = new PrismaPg({ connectionString });
     super({ adapter });
   }
