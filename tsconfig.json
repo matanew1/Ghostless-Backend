@@ -18,6 +18,8 @@
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": true,
     "paths": {
+      "@prisma/client": ["generated/prisma/client"],
+      "@prisma/client/*": ["generated/prisma/*"],
       "@ghostless/contracts": ["libs/contracts/src"],
       "@ghostless/contracts/*": ["libs/contracts/src/*"],
       "@ghostless/common": ["libs/common/src"],
