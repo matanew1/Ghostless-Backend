@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Zone {
+  GHOST_TOWN
+  CHILL
+  STEADY
+  PULSE
+  SPARK
+  UNMAPPED
+}
+
+enum PacePreference {
+  FAST
+  BALANCED
+  SLOW
+}
+
+enum MatchStatus {
+  PENDING
+  ACTIVE
+  ENDED
+}
+
+enum OAuthProvider {
+  GOOGLE
+  APPLE
+}
+
+model User {
+  id           String         @id @default(uuid())
+  email        String?        @unique
+  googleId     String?        @unique @map("google_id")
+  appleId      String?        @unique @map("apple_id")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  refreshTokens RefreshToken[]
+  profile      UserProfile?
+  metrics      UserMetrics?
+  zoneHistory  ZoneHistory[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model UserProfile {
+  id                 String          @id @default(uuid())
+  userId             String          @unique @map("user_id")
+  displayName        String?         @map("display_name")
+  bio                String?
+  tags               String[]        @default([])
+  pacePreference     PacePreference  @default(BALANCED) @map("pace_preference")
+  onboardingComplete Boolean         @default(false) @map("onboarding_complete")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  user               User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_profiles")
+}
+
+model UserMetrics {
+  id               String   @id @default(uuid())
+  userId           String   @unique @map("user_id")
+  rts              Float    @default(0.5)
+  eds              Float    @default(0.5)
+  gi               Float    @default(0)
+  reciprocity      Float    @default(0.5)
+  compositeScore   Float    @default(0.5) @map("composite_score")
+  zone             Zone     @default(UNMAPPED)
+  pendingZone      Zone?    @map("pending_zone")
+  pendingZoneRuns  Int      @default(0) @map("pending_zone_runs")
+  totalMessages    Int      @default(0) @map("total_messages")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_metrics")
+}
+
+model ZoneHistory {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  previousZone Zone     @map("previous_zone")
+  newZone      Zone     @map("new_zone")
+  createdAt    DateTime @default(now()) @map("created_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("zone_history")
+}
+
+model Match {
+  id        String      @id @default(uuid())
+  userAId   String      @map("user_a_id")
+  userBId   String      @map("user_b_id")
+  score     Float       @default(0)
+  status    MatchStatus @default(PENDING)
+  createdAt DateTime    @default(now()) @map("created_at")
+  messages  Message[]
+  interaction Interaction?
+
+  @@unique([userAId, userBId])
+  @@index([userAId])
+  @@index([userBId])
+  @@map("matches")
+}
+
+model MatchInterest {
+  id         String   @id @default(uuid())
+  fromUserId String   @map("from_user_id")
+  toUserId   String   @map("to_user_id")
+  interested Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId])
+  @@map("match_interests")
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  matchId   String    @map("match_id")
+  senderId  String    @map("sender_id")
+  content   String
+  readAt    DateTime? @map("read_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([matchId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+model Interaction {
+  id                String   @id @default(uuid())
+  matchId           String   @unique @map("match_id")
+  userAId           String   @map("user_a_id")
+  userBId           String   @map("user_b_id")
+  lastInteractionAt DateTime @default(now()) @map("last_interaction_at")
+  messageCount      Int      @default(0) @map("message_count")
+  match             Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@index([userAId, userBId])
+  @@map("interactions")
+}
