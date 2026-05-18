@@ -47,3 +47,12 @@ npm test
 ## OAuth
 
 Configure `GOOGLE_CLIENT_ID` in `.env`. For local dev without a real IdP, use service-level Swagger on auth-service to inspect contracts.
+
+To test Google login before a frontend exists:
+
+```bash
+npm run start:dev
+npm run auth:google:smoke
+```
+
+Add `http://localhost:4555` as an Authorized JavaScript origin on the Google OAuth client. Leave redirect URIs empty for this smoke-test helper.

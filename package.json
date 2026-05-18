@@ -12,6 +12,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "auth:google:smoke": "node scripts/google-oauth-smoke.mjs",
     "kafka:topics": "ts-node scripts/create-kafka-topics.ts",
     "lint": "eslint \"{apps,libs}/**/*.ts\" --fix",
     "test": "jest --watchman=false",
