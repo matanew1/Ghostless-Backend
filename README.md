@@ -46,4 +46,4 @@ npm test
 
 ## OAuth
 
-Configure `GOOGLE_CLIENT_ID` and `APPLE_CLIENT_ID` in `.env`. For local dev without real IdPs, use service-level Swagger on auth-service to inspect contracts.
+Configure `GOOGLE_CLIENT_ID` in `.env`. For local dev without a real IdP, use service-level Swagger on auth-service to inspect contracts.

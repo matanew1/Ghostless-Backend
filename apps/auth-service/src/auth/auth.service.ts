@@ -33,7 +33,7 @@ export class AuthService {
   /**
    * Verifies the ID token, upserts the user, and issues tokens.
    *
-   * @param provider - Google or Apple
+   * @param provider - Google
    * @param idToken - Provider-issued ID token
    */
   async loginWithOAuth(provider: OAuthProviderDto, idToken: string): Promise<TokenPair> {
@@ -71,23 +71,13 @@ export class AuthService {
     await this.prisma.refreshToken.deleteMany({ where: { tokenHash: hash } });
   }
 
-  /** Upserts user by Google or Apple subject id from verified claims. */
+  /** Upserts user by Google subject id from verified claims. */
   private async findOrCreateUser(verified: VerifiedOAuthUser) {
-    if (verified.googleId) {
-      return this.prisma.user.upsert({
-        where: { googleId: verified.googleId },
-        create: { email: verified.email, googleId: verified.googleId },
-        update: { email: verified.email ?? undefined },
-      });
-    }
-    if (verified.appleId) {
-      return this.prisma.user.upsert({
-        where: { appleId: verified.appleId },
-        create: { email: verified.email, appleId: verified.appleId },
-        update: { email: verified.email ?? undefined },
-      });
-    }
-    throw new Error('No OAuth identity');
+    return this.prisma.user.upsert({
+      where: { googleId: verified.googleId },
+      create: { email: verified.email, googleId: verified.googleId },
+      update: { email: verified.email ?? undefined },
+    });
   }
 
   /** Ensures profile and metrics rows exist for new users. */

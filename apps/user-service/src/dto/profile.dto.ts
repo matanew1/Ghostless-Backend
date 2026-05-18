@@ -5,7 +5,7 @@
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import { PacePreference } from '@prisma/client';
+import { PacePreference } from '@ghostless/database';
 
 /** Partial profile update from `PATCH /users/me`. */
 export class UpdateProfileDto {

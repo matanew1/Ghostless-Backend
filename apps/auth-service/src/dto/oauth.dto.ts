@@ -9,7 +9,6 @@ import { IsEnum, IsString } from 'class-validator';
 /** Supported OAuth identity providers. */
 export enum OAuthProviderDto {
   GOOGLE = 'GOOGLE',
-  APPLE = 'APPLE',
 }
 
 /** Body for `POST /auth/oauth`. */
@@ -18,7 +17,7 @@ export class OAuthLoginDto {
   @IsEnum(OAuthProviderDto)
   provider!: OAuthProviderDto;
 
-  @ApiProperty({ description: 'ID token from Google or Apple' })
+  @ApiProperty({ description: 'ID token from Google' })
   @IsString()
   idToken!: string;
 }

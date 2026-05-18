@@ -20,7 +20,7 @@ export class AuthController {
    * @param dto - Provider and ID token payload
    */
   @Post('oauth')
-  @ApiOperation({ summary: 'OAuth login with Google or Apple ID token' })
+  @ApiOperation({ summary: 'OAuth login with Google ID token' })
   async oauth(@Body() dto: OAuthLoginDto) {
     return this.authService.loginWithOAuth(dto.provider, dto.idToken);
   }

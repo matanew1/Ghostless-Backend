@@ -4,8 +4,7 @@
  */
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '@ghostless/database';
-import { Zone as PrismaZone } from '@prisma/client';
+import { PrismaService, Zone as PrismaZone } from '@ghostless/database';
 import {
   KafkaTopics,
   MessageReadEvent,
