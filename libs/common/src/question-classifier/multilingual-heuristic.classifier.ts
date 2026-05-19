@@ -4,7 +4,7 @@
  */
 
 import { Injectable } from '@nestjs/common';
-import { IQuestionClassifier } from './question-classifier.port';
+import { ClassifyOptions, IQuestionClassifier } from './question-classifier.port';
 
 /** Question-mark glyphs across scripts. */
 const QUESTION_MARKS = ['?', '？', '؟', '՞'];
@@ -54,7 +54,7 @@ const ENDINGS: Record<string, readonly string[]> = {
 @Injectable()
 export class MultilingualHeuristicClassifier implements IQuestionClassifier {
   /** @inheritdoc */
-  async classify(text: string, languageHint?: string): Promise<boolean> {
+  async classify(text: string, languageHint?: string, _options?: ClassifyOptions): Promise<boolean> {
     return this.classifySync(text, languageHint);
   }
 

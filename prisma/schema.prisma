@@ -37,6 +37,10 @@ model User {
   profile      UserProfile?
   metrics      UserMetrics?
   zoneHistory  ZoneHistory[]
+  matchesAsA   Match[]        @relation("MatchUserA")
+  matchesAsB   Match[]        @relation("MatchUserB")
+  interestsSent     MatchInterest[] @relation("InterestFrom")
+  interestsReceived MatchInterest[] @relation("InterestTo")
 
   @@map("users")
 }
@@ -108,6 +112,8 @@ model Match {
   createdAt DateTime    @default(now()) @map("created_at")
   messages  Message[]
   interaction Interaction?
+  userA     User        @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB     User        @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
 
   @@unique([userAId, userBId])
   @@index([userAId])
@@ -121,6 +127,8 @@ model MatchInterest {
   toUserId   String   @map("to_user_id")
   interested Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
+  fromUser   User     @relation("InterestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("InterestTo",   fields: [toUserId],   references: [id], onDelete: Cascade)
 
   @@unique([fromUserId, toUserId])
   @@index([toUserId])

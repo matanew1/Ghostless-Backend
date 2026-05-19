@@ -3,7 +3,7 @@
  * @module @ghostless/scoring-service
  */
 
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { DEFAULT_DEBOUNCE_MS, RECALC_QUEUE } from './recalc-queue.constants';
@@ -14,13 +14,12 @@ export interface RecalcJobData {
 }
 
 /**
- * `jobId: recalc:${userId}` dedupes any pending job for the same user.
+ * `jobId: recalc-${userId}` dedupes any pending job for the same user.
+ * (BullMQ disallows `:` in custom job ids.)
  * A burst of N events collapses into one recalc ~`debounceMs` later.
  */
 @Injectable()
 export class RecalcEnqueuer {
-  private readonly logger = new Logger(RecalcEnqueuer.name);
-
   constructor(
     @InjectQueue(RECALC_QUEUE) private readonly queue: Queue<RecalcJobData>,
     @Inject('RECALC_DEBOUNCE_MS') private readonly debounceMs: number = DEFAULT_DEBOUNCE_MS,
@@ -32,7 +31,7 @@ export class RecalcEnqueuer {
       'recalc',
       { userId },
       {
-        jobId: `recalc:${userId}`,
+        jobId: `recalc-${userId}`,
         delay: this.debounceMs,
         removeOnComplete: { count: 100 },
         removeOnFail: { count: 100 },

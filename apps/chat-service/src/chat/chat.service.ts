@@ -11,8 +11,9 @@ import {
   MessageSentEvent,
 } from '@ghostless/contracts';
 import { EVENT_BUS, IEventBus } from '@ghostless/kafka';
-import { IQuestionClassifier, QUESTION_CLASSIFIER } from '@ghostless/common';
+import { MultilingualHeuristicClassifier } from '@ghostless/common';
 import Redis from 'ioredis';
+import { RefineEnqueuer } from '../classify-queue/refine-enqueuer.service';
 
 /**
  * Core chat logic: authorization, persistence, interaction stats, and realtime fan-out.
@@ -24,7 +25,8 @@ export class ChatService {
   constructor(
     private readonly prisma: PrismaService,
     @Inject(EVENT_BUS) private readonly eventBus: IEventBus,
-    @Inject(QUESTION_CLASSIFIER) private readonly questionClassifier: IQuestionClassifier,
+    private readonly heuristic: MultilingualHeuristicClassifier,
+    private readonly refineEnqueuer: RefineEnqueuer,
   ) {
     this.redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379');
   }
@@ -55,9 +57,16 @@ export class ChatService {
    */
   async sendMessage(matchId: string, senderId: string, content: string) {
     await this.assertMatchParticipant(matchId, senderId);
-    const isQuestion = await this.questionClassifier.classify(content);
+    // Heuristic verdict is synchronous and instant; the HF refine job (below) may
+    // overwrite `isQuestion` later if the LLM disagrees. User never waits on HF.
+    const heuristicVerdict = this.heuristic.classifySync(content);
     const message = await this.prisma.message.create({
-      data: { matchId, senderId, content, isQuestion },
+      data: { matchId, senderId, content, isQuestion: heuristicVerdict },
+    });
+    await this.refineEnqueuer.enqueue({
+      messageId: message.id,
+      content,
+      heuristicVerdict,
     });
 
     const match = await this.prisma.match.findUniqueOrThrow({ where: { id: matchId } });
@@ -82,7 +91,7 @@ export class ChatService {
       senderId,
       sentAt: message.createdAt.toISOString(),
       length: content.length,
-      isQuestion,
+      isQuestion: heuristicVerdict,
     };
     await this.eventBus.publish(KafkaTopics.MESSAGE_SENT, senderId, event);
     await this.redis.publish(`match:${matchId}`, JSON.stringify({ type: 'message', message }));

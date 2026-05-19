@@ -10,6 +10,7 @@ import { JwtAuthGuard, QuestionClassifierModule } from '@ghostless/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
+import { ClassifyQueueModule } from '../classify-queue/classify-queue.module';
 
 /** Chat domain — exports {@link ChatService} for gateway injection. */
 @Module({
@@ -22,6 +23,7 @@ import { ChatGateway } from './chat.gateway';
       }),
     }),
     QuestionClassifierModule,
+    ClassifyQueueModule,
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, JwtAuthGuard],
