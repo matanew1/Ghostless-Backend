@@ -16,7 +16,8 @@
     "kafka:topics": "ts-node scripts/create-kafka-topics.ts",
     "lint": "eslint \"{apps,libs}/**/*.ts\" --fix",
     "test": "jest --watchman=false",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "test:integration": "jest --watchman=false --config ./test/integration/jest.config.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

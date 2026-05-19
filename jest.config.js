@@ -16,5 +16,9 @@ module.exports = {
     '^@ghostless/common(.*)$': '<rootDir>/libs/common/src$1',
     '^@ghostless/kafka(.*)$': '<rootDir>/libs/kafka/src$1',
     '^@ghostless/database(.*)$': '<rootDir>/libs/database/src$1',
+    '^@ghostless/network(.*)$': '<rootDir>/libs/network/src$1',
   },
+  // Integration tests live under test/ and need real Redis/Postgres/Kafka.
+  // Exclude them from the default unit run; opt in with `npm run test:integration`.
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '/test/integration/'],
 };
