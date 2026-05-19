@@ -121,7 +121,7 @@ export class ScoringService {
     const eds = this.calculator.computeEds(
       lengths,
       questionCount,
-      messages.length || 1,
+      messages.length,
       Math.min(messages.length, 10),
     );
     const gi = this.calculator.computeGi(

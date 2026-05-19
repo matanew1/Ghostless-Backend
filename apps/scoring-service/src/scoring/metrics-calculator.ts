@@ -51,7 +51,8 @@ export class MetricsCalculator {
     messageCount: number,
     threadDepth: number,
   ): number {
-    if (messageCount === 0) return 0.5;
+    // Guard on the actual divisor — caller may pass a sentinel for `messageCount`.
+    if (messageLengths.length === 0 || messageCount === 0) return 0.5;
     const avgLen = messageLengths.reduce((a, b) => a + b, 0) / messageLengths.length;
     const normLen = Math.min(avgLen / 200, 1);
     const questionRatio = questionCount / messageCount;
