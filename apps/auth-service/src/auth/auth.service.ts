@@ -16,6 +16,7 @@ export interface TokenPair {
   accessToken: string;
   refreshToken: string;
   userId: string;
+  onboardingComplete: boolean;
 }
 
 /**
@@ -39,8 +40,8 @@ export class AuthService {
   async loginWithOAuth(provider: OAuthProviderDto, idToken: string): Promise<TokenPair> {
     const verified = await this.verifier.verify(provider, idToken);
     const user = await this.findOrCreateUser(verified);
-    await this.ensureProfileAndMetrics(user.id);
-    return this.issueTokens(user.id, user.email ?? undefined);
+    const profile = await this.ensureProfileAndMetrics(user.id);
+    return this.issueTokens(user.id, user.email ?? undefined, profile.onboardingComplete);
   }
 
   /**
@@ -80,22 +81,25 @@ export class AuthService {
     });
   }
 
-  /** Ensures profile and metrics rows exist for new users. */
-  private async ensureProfileAndMetrics(userId: string): Promise<void> {
-    await this.prisma.userProfile.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    });
-    await this.prisma.userMetrics.upsert({
-      where: { userId },
-      create: { userId },
-      update: {},
-    });
+  /** Ensures profile and metrics rows exist for new users; returns the profile. */
+  private async ensureProfileAndMetrics(userId: string) {
+    const [profile] = await Promise.all([
+      this.prisma.userProfile.upsert({
+        where: { userId },
+        create: { userId },
+        update: {},
+      }),
+      this.prisma.userMetrics.upsert({
+        where: { userId },
+        create: { userId },
+        update: {},
+      }),
+    ]);
+    return profile;
   }
 
   /** Signs JWT access token and persists hashed refresh token (7-day TTL). */
-  private async issueTokens(userId: string, email?: string): Promise<TokenPair> {
+  private async issueTokens(userId: string, email?: string, onboardingComplete = false): Promise<TokenPair> {
     const accessToken = await this.jwt.signAsync({ sub: userId, email });
 
     const refreshToken = randomBytes(48).toString('hex');
@@ -111,7 +115,7 @@ export class AuthService {
       },
     });
 
-    return { accessToken, refreshToken, userId };
+    return { accessToken, refreshToken, userId, onboardingComplete };
   }
 
   /** SHA-256 hash for storing refresh tokens at rest. */

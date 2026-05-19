@@ -44,10 +44,17 @@ export class OAuthVerifierService {
     if (!clientId) {
       throw new UnauthorizedException('Google OAuth not configured');
     }
+    // Accept tokens issued for any platform client (web, iOS, Android).
+    const audience = [
+      clientId,
+      this.config.get<string>('GOOGLE_IOS_CLIENT_ID'),
+      this.config.get<string>('GOOGLE_ANDROID_CLIENT_ID'),
+      this.config.get<string>('GOOGLE_WEB_CLIENT_ID'),
+    ].filter(Boolean) as string[];
     try {
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
-        audience: clientId,
+        audience,
       });
       const payload = ticket.getPayload();
       if (!payload?.sub) {
