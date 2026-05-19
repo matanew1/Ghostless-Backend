@@ -4,8 +4,8 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
-import { PacePreference } from '@ghostless/database';
+import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { Gender, PacePreference } from '@ghostless/database';
 
 /** Partial profile update from `PATCH /users/me`. */
 export class UpdateProfileDto {
@@ -29,6 +29,17 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsEnum(PacePreference)
   pacePreference?: PacePreference;
+
+  @ApiPropertyOptional({ enum: Gender, description: "Caller's own gender." })
+  @IsOptional()
+  @IsEnum(Gender)
+  gender?: Gender;
+
+  @ApiPropertyOptional({ enum: Gender, isArray: true, description: 'Genders the caller wants to match with.' })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(Gender, { each: true })
+  seekingGenders?: Gender[];
 }
 
 /** Initial onboarding payload from `POST /users/onboarding`. */
@@ -40,6 +51,16 @@ export class OnboardingDto {
   @ApiProperty({ enum: PacePreference })
   @IsEnum(PacePreference)
   pacePreference!: PacePreference;
+
+  @ApiProperty({ enum: Gender, description: "Caller's own gender." })
+  @IsEnum(Gender)
+  gender!: Gender;
+
+  @ApiProperty({ enum: Gender, isArray: true, description: 'At least one gender the caller wants to match with.' })
+  @IsArray()
+  @IsEnum(Gender, { each: true })
+  @ArrayMinSize(1)
+  seekingGenders!: Gender[];
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()

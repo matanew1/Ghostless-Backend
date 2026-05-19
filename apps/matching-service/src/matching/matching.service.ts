@@ -57,10 +57,21 @@ export class MatchingService {
     const myZone = (myMetrics?.zone as Zone) ?? Zone.UNMAPPED;
     const myTags = new Set(me?.tags ?? []);
 
+    // Discovery requires the caller to have set both gender and seekingGenders
+    // (mutual filter is meaningless otherwise).
+    if (!me?.gender || (me.seekingGenders ?? []).length === 0) {
+      return [];
+    }
+
     const candidates = await this.prisma.userProfile.findMany({
       where: {
         userId: { not: userId },
         onboardingComplete: true,
+        // Strict mutual 1:1 gender preference filter:
+        //   1. candidate's gender must be in MY seekingGenders
+        //   2. MY gender must be in candidate's seekingGenders
+        gender: { in: me.seekingGenders },
+        seekingGenders: { has: me.gender },
       },
       take: 100,
     });
