@@ -80,6 +80,7 @@ model UserMetrics {
   pendingZone      Zone?    @map("pending_zone")
   pendingZoneRuns  Int      @default(0) @map("pending_zone_runs")
   totalMessages    Int      @default(0) @map("total_messages")
+  revision         Int      @default(0)
   updatedAt        DateTime @updatedAt @map("updated_at")
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -127,13 +128,14 @@ model MatchInterest {
 }
 
 model Message {
-  id        String    @id @default(uuid())
-  matchId   String    @map("match_id")
-  senderId  String    @map("sender_id")
-  content   String
-  readAt    DateTime? @map("read_at")
-  createdAt DateTime  @default(now()) @map("created_at")
-  match     Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  matchId    String    @map("match_id")
+  senderId   String    @map("sender_id")
+  content    String
+  isQuestion Boolean   @default(false) @map("is_question")
+  readAt     DateTime? @map("read_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  match      Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
 
   @@index([matchId])
   @@index([senderId])

@@ -45,14 +45,22 @@ export class KafkaEventBus implements IEventBus, IEventConsumer, OnModuleInit, O
     await this.disconnect();
   }
 
-  /** @inheritdoc */
+  /**
+   * @inheritdoc
+   * @remarks Required by {@link IEventConsumer}; lifecycle is normally driven
+   * by `onModuleInit`/`onModuleDestroy` — kept for non-Nest consumers and tests.
+   */
   async connect(): Promise<void> {
     if (!this.producer) {
       await this.onModuleInit();
     }
   }
 
-  /** @inheritdoc */
+  /**
+   * @inheritdoc
+   * @remarks Required by {@link IEventConsumer}; lifecycle is normally driven
+   * by `onModuleInit`/`onModuleDestroy` — kept for non-Nest consumers and tests.
+   */
   async disconnect(): Promise<void> {
     for (const c of this.consumers) {
       await c.disconnect();

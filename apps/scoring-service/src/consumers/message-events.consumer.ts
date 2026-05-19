@@ -13,9 +13,11 @@ import {
 import { EVENT_CONSUMER, IEventConsumer } from '@ghostless/kafka';
 import { ScoringService } from '../scoring/scoring.service';
 import { PrismaService } from '@ghostless/database';
+import { RecalcEnqueuer } from '../recalc-queue/recalc-enqueuer.service';
 
 /**
- * Wires message sent/read handlers and ensures metrics rows exist for new matches.
+ * Wires message sent/read handlers, ensures metrics rows exist for new matches,
+ * and enqueues per-user recalc jobs on every relevant event.
  */
 @Injectable()
 export class MessageEventsConsumer implements OnModuleInit {
@@ -23,6 +25,7 @@ export class MessageEventsConsumer implements OnModuleInit {
     @Inject(EVENT_CONSUMER) private readonly consumer: IEventConsumer,
     private readonly scoring: ScoringService,
     private readonly prisma: PrismaService,
+    private readonly enqueuer: RecalcEnqueuer,
   ) {}
 
   /** Subscribes to message and match-created topics on module startup. */
@@ -30,13 +33,20 @@ export class MessageEventsConsumer implements OnModuleInit {
     await this.consumer.subscribe<MessageSentEvent>(
       KafkaTopics.MESSAGE_SENT,
       'scoring-service-messages',
-      (e) => this.scoring.onMessageSent(e),
+      async (e) => {
+        await this.scoring.onMessageSent(e);
+        await this.enqueuer.enqueue(e.senderId);
+      },
     );
 
     await this.consumer.subscribe<MessageReadEvent>(
       KafkaTopics.MESSAGE_READ,
       'scoring-service-reads',
-      (e) => this.scoring.onMessageRead(e),
+      async (e) => {
+        await this.scoring.onMessageRead(e);
+        // Reader's ghost-index can improve once peer messages are marked read.
+        await this.enqueuer.enqueue(e.readerId);
+      },
     );
 
     await this.consumer.subscribe<MatchCreatedEvent>(
@@ -49,6 +59,7 @@ export class MessageEventsConsumer implements OnModuleInit {
             create: { userId },
             update: {},
           });
+          await this.enqueuer.enqueue(userId);
         }
       },
     );

@@ -6,7 +6,7 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { JwtAuthGuard } from '@ghostless/common';
+import { JwtAuthGuard, QuestionClassifierModule } from '@ghostless/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ChatGateway } from './chat.gateway';
@@ -21,6 +21,7 @@ import { ChatGateway } from './chat.gateway';
         secret: config.get<string>('JWT_SECRET'),
       }),
     }),
+    QuestionClassifierModule,
   ],
   controllers: [ChatController],
   providers: [ChatService, ChatGateway, JwtAuthGuard],

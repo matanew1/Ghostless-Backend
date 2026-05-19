@@ -8,6 +8,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from '@ghostless/database';
 import { KafkaModule } from '@ghostless/kafka';
 import { ScoringModule } from './scoring/scoring.module';
+import { RecalcQueueModule } from './recalc-queue/recalc-queue.module';
 import { HealthController } from './health.controller';
 import { MessageEventsConsumer } from './consumers/message-events.consumer';
 
@@ -18,6 +19,7 @@ import { MessageEventsConsumer } from './consumers/message-events.consumer';
     DatabaseModule,
     KafkaModule.forRootFromConfig('scoring'),
     ScoringModule,
+    RecalcQueueModule,
   ],
   controllers: [HealthController],
   providers: [MessageEventsConsumer],

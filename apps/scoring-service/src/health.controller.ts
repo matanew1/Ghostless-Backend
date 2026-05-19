@@ -6,12 +6,16 @@
 import { Controller, Get, Post } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { ScoringService } from './scoring/scoring.service';
+import { RecalcEnqueuer } from './recalc-queue/recalc-enqueuer.service';
 
 /** Liveness and ops endpoints for the scoring service. */
 @ApiTags('health')
 @Controller()
 export class HealthController {
-  constructor(private readonly scoring: ScoringService) {}
+  constructor(
+    private readonly scoring: ScoringService,
+    private readonly enqueuer: RecalcEnqueuer,
+  ) {}
 
   /** Returns service identity and ok status. */
   @Get('health')
@@ -19,10 +23,14 @@ export class HealthController {
     return { status: 'ok', service: 'scoring-service' };
   }
 
-  /** Triggers batch recalculation for recently active users. */
+  /** Enqueues recalculation jobs for recently active users via the BullMQ queue. */
   @Post('internal/scoring/recalculate')
   async recalculate() {
-    await this.scoring.recalculateAll();
-    return { ok: true };
+    let count = 0;
+    for await (const userId of this.scoring.streamActiveUserIds()) {
+      await this.enqueuer.enqueue(userId);
+      count++;
+    }
+    return { ok: true, enqueued: count };
   }
 }

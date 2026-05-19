@@ -9,6 +9,7 @@ import { Injectable } from '@nestjs/common';
 export interface RawStats {
   responseTimesMs: number[];
   messageLengths: number[];
+  /** Messages classified as questions (multilingual; not a raw `?` count). */
   questionCount: number;
   messageCount: number;
   threadDepth: number;
@@ -33,14 +34,14 @@ export class MetricsCalculator {
   computeRts(responseTimesMs: number[]): number {
     if (responseTimesMs.length === 0) return 0.5;
     const avg = responseTimesMs.reduce((a, b) => a + b, 0) / responseTimesMs.length;
-    return Math.exp(-avg / this.kMs);
+    return Math.exp(-avg / this.kMs); // Exponential decay function - e^(−avg/k)
   }
 
   /**
    * Engagement depth score from length, questions, and thread depth.
    *
    * @param messageLengths - Character lengths per message
-   * @param questionCount - Messages containing `?`
+   * @param questionCount - Messages classified as questions (multilingual; precomputed at ingest)
    * @param messageCount - Total messages (denominator)
    * @param threadDepth - Active thread depth cap input
    */
@@ -94,3 +95,77 @@ export class MetricsCalculator {
     return 0.4 * rts + 0.35 * eds + 0.25 * reciprocity - 0.2 * gi;
   }
 }
+
+// The formula
+
+// Score=0.4⋅RTS+0.35⋅EDS+0.25⋅Reciprocity−0.2⋅GI
+
+// What it’s doing conceptually
+
+// You’re building a behavioral quality index:
+
+// Signal	Meaning
+// RTS	responsiveness (speed)
+// EDS	engagement depth (quality of interaction)
+// Reciprocity	balance of effort
+// GI	ghosting penalty (anti-behavior signal)
+
+// So the system rewards:
+
+// fast replies
+// deep conversations
+// mutual effort
+
+// and penalizes:
+
+// unread/ignored behavior
+// Breaking down each weight
+// 1. RTS — 0.4 (highest weight)
+
+// “How responsive is the user?”
+
+// Why it’s highest:
+
+// response time is the strongest early signal of engagement
+// strongly correlated with real-world interaction quality
+// highly predictive in dating/chat systems
+// 2. EDS — 0.35
+
+// “How meaningful are conversations?”
+
+// Almost as important as speed.
+
+// Captures:
+
+// curiosity
+// message richness
+// thread depth
+
+// This prevents “fast but shallow” users from dominating.
+
+// 3. Reciprocity — 0.25
+
+// “Is effort balanced?”
+
+// Important but slightly lower weight because:
+
+// it’s match-dependent (not always user-controlled)
+// can be noisy across small samples
+
+// Still crucial for fairness.
+
+// 4. GI penalty — -0.2
+
+// “Do they ghost people?”
+
+// This is a negative correction term, not a feature.
+
+// Why it matters:
+
+// even high engagement users should be penalized if they ghost
+// enforces trustworthiness
+// Full interpretation
+
+// Your model is essentially:
+
+// “Rank users by engagement quality, but strongly punish ghosting behavior.”

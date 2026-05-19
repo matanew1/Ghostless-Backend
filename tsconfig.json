@@ -27,7 +27,9 @@
       "@ghostless/kafka": ["libs/kafka/src"],
       "@ghostless/kafka/*": ["libs/kafka/src/*"],
       "@ghostless/database": ["libs/database/src"],
-      "@ghostless/database/*": ["libs/database/src/*"]
+      "@ghostless/database/*": ["libs/database/src/*"],
+      "@ghostless/network": ["libs/network/src"],
+      "@ghostless/network/*": ["libs/network/src/*"]
     }
   }
 }

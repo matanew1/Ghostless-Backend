@@ -14,6 +14,8 @@ export interface MessageSentEvent {
   sentAt: string;
   /** Character length of message body. */
   length: number;
+  /** Whether the message was classified as a question at ingest. */
+  isQuestion: boolean;
 }
 
 /** Payload for {@link KafkaTopics.MESSAGE_READ}. */

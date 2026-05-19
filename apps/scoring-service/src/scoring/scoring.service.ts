@@ -19,16 +19,15 @@ import { ZoneClassifier } from '../zone/zone-classifier';
 /** Consecutive recalc runs required before applying a pending zone change. */
 const SOFT_TRANSITION_RUNS = 2;
 
+/** Outcome of a recalc attempt — used by the queue processor to retry on lost races. */
+export type RecalcOutcome = 'updated' | 'stale';
+
 /**
  * Aggregates message and match data into RTS/EDS/GI/reciprocity scores and zones.
  */
 @Injectable()
 export class ScoringService {
   private readonly logger = new Logger(ScoringService.name);
-  private readonly pendingStats = new Map<
-    string,
-    { responseTimes: number[]; lengths: number[]; questions: number }
-  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -38,7 +37,7 @@ export class ScoringService {
   ) {}
 
   /**
-   * Increments message count and buffers lightweight stats for batch recalc.
+   * Increments the sender's message count. Heavier recalc is queued separately.
    *
    * @param event - Message sent domain event
    */
@@ -47,18 +46,6 @@ export class ScoringService {
       where: { userId: event.senderId },
       data: { totalMessages: { increment: 1 } },
     });
-
-    const stats = this.pendingStats.get(event.senderId) ?? {
-      responseTimes: [],
-      lengths: [],
-      questions: 0,
-    };
-    stats.lengths.push(event.length);
-    if (event.length > 0) {
-      const lastChar = event.length; // question detection done on content in full impl
-      void lastChar;
-    }
-    this.pendingStats.set(event.senderId, stats);
   }
 
   /**
@@ -72,12 +59,14 @@ export class ScoringService {
 
   /**
    * Recomputes metrics and zone for one user from stored messages and matches.
+   * Uses optimistic concurrency on `UserMetrics.revision`; returns `'stale'`
+   * when another worker won the write race so callers can re-enqueue.
    *
    * @param userId - User to recalculate
    */
-  async recalculateUser(userId: string): Promise<void> {
+  async recalculateUser(userId: string): Promise<RecalcOutcome> {
     const metrics = await this.prisma.userMetrics.findUnique({ where: { userId } });
-    if (!metrics) return;
+    if (!metrics) return 'updated';
 
     const messages = await this.prisma.message.findMany({
       where: { senderId: userId },
@@ -87,7 +76,7 @@ export class ScoringService {
 
     const responseTimes: number[] = [];
     const lengths = messages.map((m) => m.content.length);
-    const questionCount = messages.filter((m) => m.content.includes('?')).length;
+    const questionCount = messages.filter((m) => m.isQuestion).length;
 
     for (let i = 1; i < messages.length; i++) {
       const prev = messages[i - 1];
@@ -161,8 +150,9 @@ export class ScoringService {
       metrics.pendingZoneRuns,
     );
 
-    await this.prisma.userMetrics.update({
-      where: { userId },
+    // Optimistic concurrency: write only if revision is unchanged.
+    const updated = await this.prisma.userMetrics.updateMany({
+      where: { userId, revision: metrics.revision },
       data: {
         rts,
         eds,
@@ -173,8 +163,14 @@ export class ScoringService {
         pendingZone: finalZone !== proposed ? (proposed as PrismaZone) : null,
         pendingZoneRuns:
           finalZone !== proposed ? metrics.pendingZoneRuns + 1 : 0,
+        revision: { increment: 1 },
       },
     });
+
+    if (updated.count === 0) {
+      this.logger.warn(`Stale recalc for ${userId} (revision ${metrics.revision} lost race)`);
+      return 'stale';
+    }
 
     if (finalZone !== currentZone) {
       await this.prisma.zoneHistory.create({
@@ -192,6 +188,8 @@ export class ScoringService {
       await this.eventBus.publish(KafkaTopics.USER_ZONE_CHANGED, userId, zoneEvent);
       this.logger.log(`Zone changed ${userId}: ${currentZone} → ${finalZone}`);
     }
+
+    return 'updated';
   }
 
   /**
@@ -226,13 +224,24 @@ export class ScoringService {
     return current;
   }
 
-  /** Recalculates all users with metrics updated in the last 7 days. */
-  async recalculateAll(): Promise<void> {
-    const active = await this.prisma.userMetrics.findMany({
-      where: { updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
-    });
-    for (const m of active) {
-      await this.recalculateUser(m.userId);
+  /**
+   * Streams active users (updated in the last 7 days) and yields their ids.
+   * Cron uses this to enqueue recalc jobs without loading everyone into memory.
+   */
+  async *streamActiveUserIds(batchSize = 500): AsyncIterableIterator<string> {
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.prisma.userMetrics.findMany({
+        where: { updatedAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+        take: batchSize,
+        ...(cursor ? { skip: 1, cursor: { id: cursor } } : {}),
+        orderBy: { id: 'asc' },
+        select: { id: true, userId: true },
+      });
+      if (page.length === 0) return;
+      for (const m of page) yield m.userId;
+      cursor = page[page.length - 1].id;
+      if (page.length < batchSize) return;
     }
   }
 }
