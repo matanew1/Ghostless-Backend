@@ -59,11 +59,16 @@ export class UsersService {
 
   /**
    * Upserts onboarding fields and marks completion.
+   * Bootstraps the User + UserMetrics rows first so FK constraints are always satisfied,
+   * even if the user was authenticated with a token from a previous DB instance.
    *
    * @param userId - Authenticated user id
    * @param dto - Onboarding payload
    */
   async completeOnboarding(userId: string, dto: OnboardingDto) {
+    await this.prisma.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
+    await this.prisma.userMetrics.upsert({ where: { userId }, create: { userId }, update: {} });
+
     return this.prisma.userProfile.upsert({
       where: { userId },
       create: {

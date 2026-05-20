@@ -11,7 +11,8 @@ import { AppModule } from './app.module';
 
 /** Creates the Nest app, mounts Swagger, and listens on the configured port. */
 async function bootstrap(): Promise<void> {
-  // Disable built-in body parser so the proxy can forward raw request bodies.
+  // Disable body parsing entirely so http-proxy-middleware can stream raw bodies
+  // through to downstream services unchanged.
   const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   const cfg = app.get(ConfigService);

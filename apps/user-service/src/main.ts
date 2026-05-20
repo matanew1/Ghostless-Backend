@@ -5,12 +5,14 @@
 
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { json } from 'express';
 import { setupApp } from '@ghostless/common';
 import { AppModule } from './app.module';
 
 /** Creates the Nest app with shared bootstrap helpers and listens on the configured port. */
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use(json({ limit: '10mb' }));
   setupApp(app, { title: 'Ghostless User Service' });
   const port = app.get(ConfigService).get<number>('USER_SERVICE_PORT', 3002);
   await app.listen(port);
