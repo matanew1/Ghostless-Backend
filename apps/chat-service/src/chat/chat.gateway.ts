@@ -77,7 +77,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     await this.chatService.assertMatchParticipant(data.matchId, client.data.userId);
     await client.join(`match:${data.matchId}`);
     const sub = this.chatService.getRedis().duplicate();
-    (this.socketSubs.get(client.id) ?? []).push(sub);
+    if (!this.socketSubs.has(client.id)) this.socketSubs.set(client.id, []);
+    this.socketSubs.get(client.id)!.push(sub);
     await sub.subscribe(`match:${data.matchId}`);
     sub.on('message', (_ch, msg) => {
       client.emit('event', JSON.parse(msg) as unknown);
