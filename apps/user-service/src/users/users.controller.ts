@@ -44,6 +44,13 @@ export class UsersController {
     return this.usersService.getZone(user.sub);
   }
 
+  /** Returns the public read-only profile for any user by id. */
+  @Get(':userId/profile')
+  @UseGuards(JwtAuthGuard)
+  getPublicProfile(@Param('userId') userId: string) {
+    return this.usersService.getPublicProfile(userId);
+  }
+
   /** Returns the public avatar URL for any user by id. */
   @Get(':userId/avatar')
   @UseGuards(JwtAuthGuard)

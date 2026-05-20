@@ -108,6 +108,33 @@ export class UsersService {
   }
 
   /**
+   * Returns the public-facing profile for any user (read-only, safe for display).
+   *
+   * @param userId - Target user id
+   */
+  async getPublicProfile(userId: string) {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: {
+        displayName: true,
+        bio: true,
+        avatarUrl: true,
+        tags: true,
+        pacePreference: true,
+        gender: true,
+      },
+    });
+    if (!profile) throw new NotFoundException('Profile not found');
+
+    const metrics = await this.prisma.userMetrics.findUnique({
+      where: { userId },
+      select: { zone: true },
+    });
+
+    return { ...profile, zone: metrics?.zone ?? null };
+  }
+
+  /**
    * Returns the public avatar URL for a user, or null if unset.
    *
    * @param userId - Target user id
