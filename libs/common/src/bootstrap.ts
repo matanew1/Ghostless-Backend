@@ -18,7 +18,11 @@ export interface SwaggerOptions {
  * @param app - Nest application instance
  * @param swagger - OpenAPI metadata
  */
-export function setupApp(app: INestApplication, swagger: SwaggerOptions): void {
+export function setupApp(
+  app: INestApplication,
+  swagger: SwaggerOptions,
+  options?: { bodyParserLimit?: string },
+): void {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
