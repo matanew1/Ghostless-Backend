@@ -45,7 +45,7 @@ export class ChatService {
     if (match.userAId !== userId && match.userBId !== userId) {
       throw new ForbiddenException('Not a participant');
     }
-    return match;
+    return match; // callers reuse this to avoid a second round-trip
   }
 
   /**
@@ -56,7 +56,7 @@ export class ChatService {
    * @param content - Message text
    */
   async sendMessage(matchId: string, senderId: string, content: string) {
-    await this.assertMatchParticipant(matchId, senderId);
+    const match = await this.assertMatchParticipant(matchId, senderId);
     // Heuristic verdict is synchronous and instant; the HF refine job (below) may
     // overwrite `isQuestion` later if the LLM disagrees. User never waits on HF.
     const heuristicVerdict = this.heuristic.classifySync(content);
@@ -69,7 +69,6 @@ export class ChatService {
       heuristicVerdict,
     });
 
-    const match = await this.prisma.match.findUniqueOrThrow({ where: { id: matchId } });
     await this.prisma.interaction.upsert({
       where: { matchId },
       create: {

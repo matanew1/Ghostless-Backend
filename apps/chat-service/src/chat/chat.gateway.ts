@@ -7,11 +7,13 @@ import {
   ConnectedSocket,
   MessageBody,
   OnGatewayConnection,
+  OnGatewayDisconnect,
   SubscribeMessage,
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import Redis from 'ioredis';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { ChatService } from './chat.service';
@@ -21,9 +23,12 @@ import { ChatService } from './chat.service';
  * joins match rooms, and relays Redis pub/sub to connected clients.
  */
 @WebSocketGateway({ namespace: '/chat', cors: { origin: '*' } })
-export class ChatGateway implements OnGatewayConnection {
+export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server!: Server;
+
+  /** Tracks per-socket Redis subscribers so they are cleaned up on disconnect. */
+  private readonly socketSubs = new Map<string, Redis[]>();
 
   constructor(
     private readonly chatService: ChatService,
@@ -45,9 +50,17 @@ export class ChatGateway implements OnGatewayConnection {
         secret: this.config.get<string>('JWT_SECRET'),
       });
       client.data.userId = payload.sub;
+      this.socketSubs.set(client.id, []);
     } catch {
       client.disconnect();
     }
+  }
+
+  /** Disconnects all Redis subscribers opened by this socket. */
+  async handleDisconnect(client: Socket): Promise<void> {
+    const subs = this.socketSubs.get(client.id) ?? [];
+    await Promise.all(subs.map((s) => s.disconnect()));
+    this.socketSubs.delete(client.id);
   }
 
   /**
@@ -63,11 +76,11 @@ export class ChatGateway implements OnGatewayConnection {
   ): Promise<void> {
     await this.chatService.assertMatchParticipant(data.matchId, client.data.userId);
     await client.join(`match:${data.matchId}`);
-    const redis = this.chatService.getRedis();
-    const sub = redis.duplicate();
+    const sub = this.chatService.getRedis().duplicate();
+    (this.socketSubs.get(client.id) ?? []).push(sub);
     await sub.subscribe(`match:${data.matchId}`);
     sub.on('message', (_ch, msg) => {
-      client.emit('event', JSON.parse(msg));
+      client.emit('event', JSON.parse(msg) as unknown);
     });
   }
 

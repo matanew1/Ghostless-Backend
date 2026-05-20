@@ -42,9 +42,10 @@ export class ScoringService {
    * @param event - Message sent domain event
    */
   async onMessageSent(event: MessageSentEvent): Promise<void> {
-    await this.prisma.userMetrics.update({
+    await this.prisma.userMetrics.upsert({
       where: { userId: event.senderId },
-      data: { totalMessages: { increment: 1 } },
+      create: { userId: event.senderId, totalMessages: 1 },
+      update: { totalMessages: { increment: 1 } },
     });
   }
 
@@ -142,13 +143,22 @@ export class ScoringService {
     });
 
     const currentZone = metrics.zone as unknown as Zone;
-    const finalZone = await this.applySoftTransition(
-      userId,
+    const pendingZone = metrics.pendingZone as unknown as Zone | null;
+    const finalZone = this.applySoftTransition(
       currentZone,
       proposed,
-      metrics.pendingZone as unknown as Zone | null,
+      pendingZone,
       metrics.pendingZoneRuns,
     );
+
+    // pendingZoneRuns: increment when the same zone is accumulating,
+    // reset to 1 when a new proposed zone appears, clear on transition.
+    const nextPendingZone = (finalZone !== proposed && proposed !== currentZone)
+      ? (proposed as PrismaZone)
+      : null;
+    const nextPendingZoneRuns = nextPendingZone !== null
+      ? (pendingZone === proposed ? metrics.pendingZoneRuns + 1 : 1)
+      : 0;
 
     // Optimistic concurrency: write only if revision is unchanged.
     const updated = await this.prisma.userMetrics.updateMany({
@@ -160,9 +170,8 @@ export class ScoringService {
         reciprocity,
         compositeScore,
         zone: finalZone as PrismaZone,
-        pendingZone: finalZone !== proposed ? (proposed as PrismaZone) : null,
-        pendingZoneRuns:
-          finalZone !== proposed ? metrics.pendingZoneRuns + 1 : 0,
+        pendingZone: nextPendingZone,
+        pendingZoneRuns: nextPendingZoneRuns,
         revision: { increment: 1 },
       },
     });
@@ -201,27 +210,15 @@ export class ScoringService {
    * @param pending - Previously pending zone, if any
    * @param pendingRuns - How many runs the pending zone has been seen
    */
-  private async applySoftTransition(
-    userId: string,
+  private applySoftTransition(
     current: Zone,
     proposed: Zone,
     pending: Zone | null,
     pendingRuns: number,
-  ): Promise<Zone> {
-    if (proposed === current) {
-      return current;
-    }
-    if (pending === proposed && pendingRuns + 1 >= SOFT_TRANSITION_RUNS) {
-      return proposed;
-    }
-    if (pending !== proposed) {
-      await this.prisma.userMetrics.update({
-        where: { userId },
-        data: { pendingZone: proposed as PrismaZone, pendingZoneRuns: 1 },
-      });
-      return current;
-    }
-    return current;
+  ): Zone {
+    if (proposed === current) return current;
+    if (pending === proposed && pendingRuns + 1 >= SOFT_TRANSITION_RUNS) return proposed;
+    return current; // accumulating — caller writes pendingZone/pendingZoneRuns via updateMany
   }
 
   /**
