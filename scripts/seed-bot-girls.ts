@@ -15,6 +15,8 @@ type BotSeed = {
   gi: number;
   reciprocity: number;
   avatarImg: number;
+  /** If true, this bot gets a pre-seeded interest towards every real (non-bot) user. */
+  preliked?: boolean;
 };
 
 const BOT_GIRLS: BotSeed[] = [
@@ -88,6 +90,21 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.88,
     avatarImg: 16,
   },
+  {
+    email: 'zoe.bot@ghostless.seed',
+    googleId: 'seed-bot-girl-zoe',
+    displayName: 'Zoe',
+    bio: 'Already thinking about you. Swipe right and find out why.',
+    tags: ['Art', 'Music', 'Coffee', 'Night owl', 'Deep talks'],
+    pacePreference: PacePreference.BALANCED,
+    zone: Zone.SPARK,
+    rts: 0.79,
+    eds: 0.85,
+    gi: 0.02,
+    reciprocity: 0.95,
+    avatarImg: 20,
+    preliked: true,
+  },
 ];
 
 function createClient() {
@@ -101,10 +118,14 @@ function createClient() {
   });
 }
 
+const BOT_GOOGLE_IDS = new Set(BOT_GIRLS.map((b) => b.googleId));
+
 async function main() {
   const prisma = createClient();
 
   try {
+    const prelikedBotIds: string[] = [];
+
     for (const bot of BOT_GIRLS) {
       const avatarUrl = `https://i.pravatar.cc/300?img=${bot.avatarImg}`;
 
@@ -168,6 +189,34 @@ async function main() {
       });
 
       console.log(`Seeded ${bot.displayName} (${bot.zone}) — avatar: ${avatarUrl}`);
+
+      if (bot.preliked) {
+        prelikedBotIds.push(user.id);
+      }
+    }
+
+    // For every pre-liked bot, insert an interest record towards each real user
+    // (non-bot, onboarding complete) so the first like from a real user triggers
+    // an immediate match.
+    if (prelikedBotIds.length > 0) {
+      const realUsers = await prisma.user.findMany({
+        where: {
+          googleId: { notIn: [...BOT_GOOGLE_IDS] },
+          profile: { onboardingComplete: true },
+        },
+        select: { id: true },
+      });
+
+      for (const botUserId of prelikedBotIds) {
+        for (const { id: realUserId } of realUsers) {
+          await prisma.matchInterest.upsert({
+            where: { fromUserId_toUserId: { fromUserId: botUserId, toUserId: realUserId } },
+            create: { fromUserId: botUserId, toUserId: realUserId, interested: true },
+            update: { interested: true },
+          });
+        }
+        console.log(`Pre-liked: bot ${botUserId} → ${realUsers.length} real user(s)`);
+      }
     }
   } finally {
     await prisma.$disconnect();
