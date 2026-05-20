@@ -4,7 +4,6 @@
  */
 
 import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '@ghostless/database';
@@ -28,7 +27,6 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly verifier: OAuthVerifierService,
-    private readonly config: ConfigService,
   ) {}
 
   /**
@@ -59,7 +57,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
     await this.prisma.refreshToken.delete({ where: { id: stored.id } });
-    return this.issueTokens(stored.userId, stored.user.email ?? undefined);
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId: stored.userId },
+      select: { onboardingComplete: true },
+    });
+    return this.issueTokens(stored.userId, stored.user.email ?? undefined, profile?.onboardingComplete ?? false);
   }
 
   /**
