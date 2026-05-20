@@ -17,13 +17,6 @@ type BotSeed = {
   avatarImg: number;
 };
 
-async function fetchAvatarBase64(imgIndex: number): Promise<string> {
-  const res = await fetch(`https://i.pravatar.cc/300?img=${imgIndex}`);
-  const buffer = await res.arrayBuffer();
-  const base64 = Buffer.from(buffer).toString('base64');
-  return `data:image/jpeg;base64,${base64}`;
-}
-
 const BOT_GIRLS: BotSeed[] = [
   {
     email: 'lina.bot@ghostless.seed',
@@ -113,7 +106,7 @@ async function main() {
 
   try {
     for (const bot of BOT_GIRLS) {
-      const avatarData = await fetchAvatarBase64(bot.avatarImg);
+      const avatarUrl = `https://i.pravatar.cc/300?img=${bot.avatarImg}`;
 
       const user = await prisma.user.upsert({
         where: { googleId: bot.googleId },
@@ -137,7 +130,7 @@ async function main() {
           gender: Gender.FEMALE,
           seekingGenders: [Gender.MALE],
           onboardingComplete: true,
-          avatarData,
+          avatarUrl,
         },
         update: {
           displayName: bot.displayName,
@@ -147,7 +140,7 @@ async function main() {
           gender: Gender.FEMALE,
           seekingGenders: [Gender.MALE],
           onboardingComplete: true,
-          avatarData,
+          avatarUrl,
         },
       });
 
@@ -174,7 +167,7 @@ async function main() {
         },
       });
 
-      console.log(`Seeded ${bot.displayName} (${bot.zone}) seeking men`);
+      console.log(`Seeded ${bot.displayName} (${bot.zone}) — avatar: ${avatarUrl}`);
     }
   } finally {
     await prisma.$disconnect();

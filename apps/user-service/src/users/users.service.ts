@@ -4,6 +4,8 @@
  */
 
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { PrismaService } from '@ghostless/database';
 import { Zone, toDisplayZone } from '@ghostless/contracts';
 import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
@@ -11,7 +13,17 @@ import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
 /** Persists and reads user profiles and zone display data. */
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly supabase: SupabaseClient;
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {
+    this.supabase = createClient(
+      this.config.get<string>('SUPABASE_URL', ''),
+      this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', ''),
+    );
+  }
 
   /**
    * Loads profile by user id.
@@ -25,15 +37,23 @@ export class UsersService {
   }
 
   /**
-   * Applies partial profile updates.
+   * Applies partial profile updates. If avatarData is provided it is uploaded
+   * to Supabase Storage and only the resulting public URL is stored in the DB.
    *
    * @param userId - Authenticated user id
    * @param dto - Fields to update
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const { avatarData, ...rest } = dto;
+    const data: Record<string, unknown> = { ...rest };
+
+    if (avatarData) {
+      data.avatarUrl = await this.uploadAvatar(userId, avatarData);
+    }
+
     return this.prisma.userProfile.update({
       where: { userId },
-      data: dto,
+      data,
     });
   }
 
@@ -81,16 +101,16 @@ export class UsersService {
   }
 
   /**
-   * Returns the avatar data URI for a user, or null if unset.
+   * Returns the public avatar URL for a user, or null if unset.
    *
    * @param userId - Target user id
    */
-  async getAvatarData(userId: string): Promise<string | null> {
+  async getAvatarUrl(userId: string): Promise<string | null> {
     const profile = await this.prisma.userProfile.findUnique({
       where: { userId },
-      select: { avatarData: true },
+      select: { avatarUrl: true },
     });
-    return profile?.avatarData ?? null;
+    return profile?.avatarUrl ?? null;
   }
 
   /**
@@ -110,5 +130,26 @@ export class UsersService {
       update: {},
     });
     return { ok: true };
+  }
+
+  /**
+   * Decodes a base64 data URI and uploads it to the Supabase Storage
+   * `avatars` bucket, returning the public URL.
+   */
+  private async uploadAvatar(userId: string, dataUri: string): Promise<string> {
+    const base64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64, 'base64');
+
+    const { error } = await this.supabase.storage
+      .from('avatars')
+      .upload(`${userId}.jpg`, buffer, { contentType: 'image/jpeg', upsert: true });
+
+    if (error) throw new Error(`Avatar upload failed: ${error.message}`);
+
+    const { data } = this.supabase.storage
+      .from('avatars')
+      .getPublicUrl(`${userId}.jpg`);
+
+    return data.publicUrl;
   }
 }

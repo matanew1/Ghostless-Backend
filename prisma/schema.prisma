@@ -76,7 +76,7 @@ model UserProfile {
   gender             Gender?
   /** Genders the caller wants to be matched with; empty array means "nobody". */
   seekingGenders     Gender[]        @default([]) @map("seeking_genders")
-  avatarData         String?         @map("avatar_data")
+  avatarUrl          String?         @map("avatar_url")
   onboardingComplete Boolean         @default(false) @map("onboarding_complete")
   createdAt          DateTime        @default(now()) @map("created_at")
   updatedAt          DateTime        @updatedAt @map("updated_at")

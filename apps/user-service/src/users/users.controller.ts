@@ -44,12 +44,12 @@ export class UsersController {
     return this.usersService.getZone(user.sub);
   }
 
-  /** Returns the avatar data URI for any user by id. */
+  /** Returns the public avatar URL for any user by id. */
   @Get(':userId/avatar')
   @UseGuards(JwtAuthGuard)
   async getAvatar(@Param('userId') userId: string) {
-    const avatarData = await this.usersService.getAvatarData(userId);
-    if (avatarData === null) throw new NotFoundException('No avatar set');
-    return { avatarData };
+    const avatarUrl = await this.usersService.getAvatarUrl(userId);
+    if (avatarUrl === null) throw new NotFoundException('No avatar set');
+    return { avatarUrl };
   }
 }
