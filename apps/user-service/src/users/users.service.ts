@@ -49,13 +49,19 @@ export class UsersService {
       create: {
         userId,
         displayName: dto.displayName,
+        bio: dto.bio,
         pacePreference: dto.pacePreference,
+        gender: dto.gender,
+        seekingGenders: dto.seekingGenders,
         tags: dto.tags ?? [],
         onboardingComplete: dto.onboardingComplete ?? true,
       },
       update: {
         displayName: dto.displayName,
+        bio: dto.bio,
         pacePreference: dto.pacePreference,
+        gender: dto.gender,
+        seekingGenders: dto.seekingGenders,
         tags: dto.tags ?? [],
         onboardingComplete: dto.onboardingComplete ?? true,
       },
@@ -72,6 +78,19 @@ export class UsersService {
     if (!metrics) throw new NotFoundException('Metrics not found');
     const zone = metrics.zone as unknown as Zone;
     return { zone: toDisplayZone(zone) };
+  }
+
+  /**
+   * Returns the avatar data URI for a user, or null if unset.
+   *
+   * @param userId - Target user id
+   */
+  async getAvatarData(userId: string): Promise<string | null> {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { avatarData: true },
+    });
+    return profile?.avatarData ?? null;
   }
 
   /**

@@ -40,6 +40,11 @@ export class UpdateProfileDto {
   @IsArray()
   @IsEnum(Gender, { each: true })
   seekingGenders?: Gender[];
+
+  @ApiPropertyOptional({ description: 'Base64 data URI of the profile image.' })
+  @IsOptional()
+  @IsString()
+  avatarData?: string;
 }
 
 /** Initial onboarding payload from `POST /users/onboarding`. */
@@ -51,6 +56,11 @@ export class OnboardingDto {
   @ApiProperty({ enum: PacePreference })
   @IsEnum(PacePreference)
   pacePreference!: PacePreference;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  bio?: string;
 
   @ApiProperty({ enum: Gender, description: "Caller's own gender." })
   @IsEnum(Gender)

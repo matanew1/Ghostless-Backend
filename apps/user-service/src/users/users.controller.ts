@@ -3,7 +3,7 @@
  * @module @ghostless/user-service
  */
 
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, JwtPayload } from '@ghostless/common';
 import { UsersService } from './users.service';
@@ -42,5 +42,14 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   getZone(@CurrentUser() user: JwtPayload) {
     return this.usersService.getZone(user.sub);
+  }
+
+  /** Returns the avatar data URI for any user by id. */
+  @Get(':userId/avatar')
+  @UseGuards(JwtAuthGuard)
+  async getAvatar(@Param('userId') userId: string) {
+    const avatarData = await this.usersService.getAvatarData(userId);
+    if (avatarData === null) throw new NotFoundException('No avatar set');
+    return { avatarData };
   }
 }
