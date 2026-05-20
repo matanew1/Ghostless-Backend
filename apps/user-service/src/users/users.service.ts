@@ -5,7 +5,7 @@
 
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { StorageClient } from '@supabase/storage-js';
 import { PrismaService } from '@ghostless/database';
 import { Zone, toDisplayZone } from '@ghostless/contracts';
 import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
@@ -13,16 +13,18 @@ import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
 /** Persists and reads user profiles and zone display data. */
 @Injectable()
 export class UsersService {
-  private readonly supabase: SupabaseClient;
+  private readonly storage: StorageClient;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
   ) {
-    this.supabase = createClient(
-      this.config.get<string>('SUPABASE_URL', ''),
-      this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', ''),
-    );
+    const url = this.config.get<string>('SUPABASE_URL', '');
+    const key = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY', '');
+    this.storage = new StorageClient(`${url}/storage/v1`, {
+      apikey: key,
+      Authorization: `Bearer ${key}`,
+    });
   }
 
   /**
@@ -145,13 +147,13 @@ export class UsersService {
     const base64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
     const buffer = Buffer.from(base64, 'base64');
 
-    const { error } = await this.supabase.storage
+    const { error } = await this.storage
       .from('avatars')
       .upload(`${userId}.jpg`, buffer, { contentType: 'image/jpeg', upsert: true });
 
     if (error) throw new Error(`Avatar upload failed: ${error.message}`);
 
-    const { data } = this.supabase.storage
+    const { data } = this.storage
       .from('avatars')
       .getPublicUrl(`${userId}.jpg`);
 

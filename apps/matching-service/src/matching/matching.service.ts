@@ -84,7 +84,7 @@ export class MatchingService {
     );
     excluded.add(userId);
 
-    const scored: Array<{ userId: string; score: number; zone: Zone }> = [];
+    const scored: Array<{ userId: string; score: number; zone: Zone; displayName: string | null; avatarUrl: string | null }> = [];
 
     for (const c of candidates) {
       if (excluded.has(c.userId)) continue;
@@ -105,16 +105,18 @@ export class MatchingService {
       const score =
         interestSim + alignment + velocityMatch - ghostPenalty;
 
-      scored.push({ userId: c.userId, score, zone: theirZone });
+      scored.push({ userId: c.userId, score, zone: theirZone, displayName: c.displayName ?? null, avatarUrl: c.avatarUrl ?? null });
     }
 
     return scored
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
-      .map(({ userId: id, score, zone }) => ({
+      .map(({ userId: id, score, zone, displayName, avatarUrl }) => ({
         userId: id,
         score,
         zone,
+        displayName,
+        avatarUrl,
       }));
   }
 
@@ -178,11 +180,28 @@ export class MatchingService {
     return match;
   }
 
-  /** Returns matches where the user is userA or userB. */
+  /** Returns matches where the user is userA or userB, enriched with partner profile. */
   async listMatches(userId: string) {
-    return this.prisma.match.findMany({
+    const matches = await this.prisma.match.findMany({
       where: { OR: [{ userAId: userId }, { userBId: userId }] },
       orderBy: { createdAt: 'desc' },
+    });
+
+    const partnerIds = matches.map((m) => (m.userAId === userId ? m.userBId : m.userAId));
+    const profiles = await this.prisma.userProfile.findMany({
+      where: { userId: { in: partnerIds } },
+      select: { userId: true, displayName: true, avatarUrl: true },
+    });
+    const profileMap = new Map(profiles.map((p) => [p.userId, p]));
+
+    return matches.map((m) => {
+      const partnerId = m.userAId === userId ? m.userBId : m.userAId;
+      const profile = profileMap.get(partnerId);
+      return {
+        ...m,
+        partnerDisplayName: profile?.displayName ?? null,
+        partnerAvatarUrl: profile?.avatarUrl ?? null,
+      };
     });
   }
 
