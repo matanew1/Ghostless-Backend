@@ -15,6 +15,8 @@ type BotSeed = {
   gi: number;
   reciprocity: number;
   avatarImg: number;
+  /** Additional gallery photo seeds (picsum.photos seed strings). */
+  photoSeeds: string[];
   /** If true, this bot gets a pre-seeded interest towards every real (non-bot) user. */
   preliked?: boolean;
 };
@@ -33,6 +35,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.06,
     reciprocity: 0.86,
     avatarImg: 1,
+    photoSeeds: ['lina-cafe', 'lina-night', 'lina-music'],
   },
   {
     email: 'maya.bot@ghostless.seed',
@@ -47,6 +50,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.03,
     reciprocity: 0.9,
     avatarImg: 5,
+    photoSeeds: ['maya-travel', 'maya-food', 'maya-gym'],
   },
   {
     email: 'noa.bot@ghostless.seed',
@@ -61,6 +65,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.08,
     reciprocity: 0.82,
     avatarImg: 9,
+    photoSeeds: ['noa-book', 'noa-art', 'noa-kitchen'],
   },
   {
     email: 'tali.bot@ghostless.seed',
@@ -75,6 +80,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.05,
     reciprocity: 0.74,
     avatarImg: 12,
+    photoSeeds: ['tali-hike', 'tali-beach', 'tali-city'],
   },
   {
     email: 'ella.bot@ghostless.seed',
@@ -89,6 +95,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.04,
     reciprocity: 0.88,
     avatarImg: 16,
+    photoSeeds: ['ella-gaming', 'ella-snacks', 'ella-movies'],
   },
   {
     email: 'zoe.bot@ghostless.seed',
@@ -103,6 +110,7 @@ const BOT_GIRLS: BotSeed[] = [
     gi: 0.02,
     reciprocity: 0.95,
     avatarImg: 20,
+    photoSeeds: ['zoe-art', 'zoe-coffee', 'zoe-night'],
     preliked: true,
   },
 ];
@@ -124,10 +132,20 @@ async function main() {
   const prisma = createClient();
 
   try {
+    // Drop existing bot users — all related data cascades (profile, metrics, interests, matches, messages)
+    const deleted = await prisma.user.deleteMany({
+      where: { googleId: { in: [...BOT_GOOGLE_IDS] } },
+    });
+    console.log(`Dropped ${deleted.count} existing bot user(s).`);
+
     const prelikedBotIds: string[] = [];
 
     for (const bot of BOT_GIRLS) {
-      const avatarUrl = `https://i.pravatar.cc/300?img=${bot.avatarImg}`;
+      const avatarUrl = `https://i.pravatar.cc/400?img=${bot.avatarImg}`;
+      // Gallery photos: seeded picsum images (consistent across re-seeds, portrait crop)
+      const photos = bot.photoSeeds.map(
+        (seed) => `https://picsum.photos/seed/${seed}/400/560`,
+      );
 
       const user = await prisma.user.upsert({
         where: { googleId: bot.googleId },
@@ -152,6 +170,7 @@ async function main() {
           seekingGenders: [Gender.MALE],
           onboardingComplete: true,
           avatarUrl,
+          photos,
         },
         update: {
           displayName: bot.displayName,
@@ -162,6 +181,7 @@ async function main() {
           seekingGenders: [Gender.MALE],
           onboardingComplete: true,
           avatarUrl,
+          photos,
         },
       });
 
@@ -188,7 +208,7 @@ async function main() {
         },
       });
 
-      console.log(`Seeded ${bot.displayName} (${bot.zone}) — avatar: ${avatarUrl}`);
+      console.log(`Seeded ${bot.displayName} (${bot.zone}) — avatar + ${photos.length} photos`);
 
       if (bot.preliked) {
         prelikedBotIds.push(user.id);
