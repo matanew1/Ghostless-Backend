@@ -96,7 +96,7 @@ model UserMetrics {
   gi               Float    @default(0)
   reciprocity      Float    @default(0.5)
   compositeScore   Float    @default(0.5) @map("composite_score")
-  zone             Zone     @default(UNMAPPED)
+  zone             Zone     @default(STEADY)
   pendingZone      Zone?    @map("pending_zone")
   pendingZoneRuns  Int      @default(0) @map("pending_zone_runs")
   totalMessages    Int      @default(0) @map("total_messages")
