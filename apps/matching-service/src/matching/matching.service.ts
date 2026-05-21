@@ -3,7 +3,7 @@
  * @module @ghostless/matching-service
  */
 
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@ghostless/database';
 import { InterestExpressedEvent, KafkaTopics, MatchCreatedEvent, Zone } from '@ghostless/contracts';
 import { EVENT_BUS, IEventBus } from '@ghostless/kafka';
@@ -215,6 +215,25 @@ export class MatchingService {
         partnerDisplayName: profile?.displayName ?? null,
         partnerAvatarUrl: profile?.avatarUrl ?? null,
       };
+    });
+  }
+
+  /**
+   * Ends a match by setting its status to ENDED.
+   * Throws if the match doesn't exist or the caller is not a participant.
+   *
+   * @param userId - Caller user id (must be userA or userB)
+   * @param matchId - Match to end
+   */
+  async unmatch(userId: string, matchId: string) {
+    const match = await this.prisma.match.findUnique({ where: { id: matchId } });
+    if (!match) throw new NotFoundException('Match not found');
+    if (match.userAId !== userId && match.userBId !== userId) {
+      throw new ForbiddenException('Not a participant of this match');
+    }
+    return this.prisma.match.update({
+      where: { id: matchId },
+      data:  { status: 'ENDED' },
     });
   }
 

@@ -3,7 +3,7 @@
  * @module @ghostless/matching-service
  */
 
-import { Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import { Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, JwtPayload } from '@ghostless/common';
 import { MatchingService } from './matching.service';
@@ -44,5 +44,17 @@ export class MatchingController {
   @UseGuards(JwtAuthGuard)
   list(@CurrentUser() user: JwtPayload) {
     return this.matching.listMatches(user.sub);
+  }
+
+  /**
+   * Ends a match — sets status to ENDED. Caller must be a participant.
+   *
+   * @param user - JWT payload
+   * @param matchId - Match to end
+   */
+  @Delete('matches/:matchId')
+  @UseGuards(JwtAuthGuard)
+  unmatch(@CurrentUser() user: JwtPayload, @Param('matchId') matchId: string) {
+    return this.matching.unmatch(user.sub, matchId);
   }
 }
