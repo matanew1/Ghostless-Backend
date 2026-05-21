@@ -4,8 +4,11 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMinSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
 import { Gender, PacePreference } from '@ghostless/database';
+
+/** Maximum number of additional gallery photos per user (avatar excluded). */
+export const MAX_USER_PHOTOS = 5;
 
 /** Partial profile update from `PATCH /users/me`. */
 export class UpdateProfileDto {
@@ -45,6 +48,23 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   avatarData?: string;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: `Replaces the full additional photos array. Max ${MAX_USER_PHOTOS} URLs.`,
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  @ArrayMaxSize(MAX_USER_PHOTOS)
+  photos?: string[];
+}
+
+/** Adds a single base64 image to the user's gallery (avatar excluded). */
+export class AddPhotoDto {
+  @ApiProperty({ description: 'Base64 data URI of the photo to add.' })
+  @IsString()
+  photoData!: string;
 }
 
 /** Initial onboarding payload from `POST /users/onboarding`. */

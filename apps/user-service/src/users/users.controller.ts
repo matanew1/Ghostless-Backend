@@ -3,11 +3,23 @@
  * @module @ghostless/user-service
  */
 
-import { Body, Controller, Get, NotFoundException, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  NotFoundException,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, JwtAuthGuard, JwtPayload } from '@ghostless/common';
 import { UsersService } from './users.service';
-import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
+import { AddPhotoDto, OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
 
 /** Public user API mounted at `/users`. */
 @ApiTags('users')
@@ -58,5 +70,22 @@ export class UsersController {
     const avatarUrl = await this.usersService.getAvatarUrl(userId);
     if (avatarUrl === null) throw new NotFoundException('No avatar set');
     return { avatarUrl };
+  }
+
+  /** Uploads one additional gallery photo for the caller. */
+  @Post('me/photos')
+  @UseGuards(JwtAuthGuard)
+  addPhoto(@CurrentUser() user: JwtPayload, @Body() dto: AddPhotoDto) {
+    return this.usersService.addPhoto(user.sub, dto.photoData);
+  }
+
+  /** Removes the gallery photo at the given zero-based index. */
+  @Delete('me/photos/:index')
+  @UseGuards(JwtAuthGuard)
+  removePhoto(
+    @CurrentUser() user: JwtPayload,
+    @Param('index', ParseIntPipe) index: number,
+  ) {
+    return this.usersService.removePhoto(user.sub, index);
   }
 }

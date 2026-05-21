@@ -3,12 +3,13 @@
  * @module @ghostless/user-service
  */
 
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { ConfigService } from '@nestjs/config';
 import { StorageClient } from '@supabase/storage-js';
 import { PrismaService } from '@ghostless/database';
 import { Zone, toDisplayZone } from '@ghostless/contracts';
-import { OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
+import { MAX_USER_PHOTOS, OnboardingDto, UpdateProfileDto } from '../dto/profile.dto';
 
 /** Persists and reads user profiles and zone display data. */
 @Injectable()
@@ -46,11 +47,18 @@ export class UsersService {
    * @param dto - Fields to update
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const { avatarData, ...rest } = dto;
+    const { avatarData, photos, ...rest } = dto;
     const data: Record<string, unknown> = { ...rest };
 
     if (avatarData) {
       data.avatarUrl = await this.uploadAvatar(userId, avatarData);
+    }
+
+    if (photos) {
+      if (photos.length > MAX_USER_PHOTOS) {
+        throw new BadRequestException(`At most ${MAX_USER_PHOTOS} additional photos are allowed.`);
+      }
+      data.photos = photos;
     }
 
     return this.prisma.userProfile.update({
@@ -119,6 +127,7 @@ export class UsersService {
         displayName: true,
         bio: true,
         avatarUrl: true,
+        photos: true,
         tags: true,
         pacePreference: true,
         gender: true,
@@ -132,6 +141,52 @@ export class UsersService {
     });
 
     return { ...profile, zone: metrics?.zone ?? null };
+  }
+
+  /**
+   * Appends a new photo to the caller's gallery. Avatar is unaffected.
+   * Enforces the `MAX_USER_PHOTOS` cap.
+   *
+   * @param userId - Authenticated user id
+   * @param dataUri - Base64 data URI of the photo
+   */
+  async addPhoto(userId: string, dataUri: string) {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { photos: true },
+    });
+    if (!profile) throw new NotFoundException('Profile not found');
+    if (profile.photos.length >= MAX_USER_PHOTOS) {
+      throw new BadRequestException(`Photo limit reached (${MAX_USER_PHOTOS}). Remove one first.`);
+    }
+    const url = await this.uploadPhoto(userId, dataUri);
+    return this.prisma.userProfile.update({
+      where: { userId },
+      data: { photos: [...profile.photos, url] },
+    });
+  }
+
+  /**
+   * Removes the photo at `index` from the caller's gallery. No-op storage
+   * delete (Supabase public URLs become inaccessible only via DB linkage).
+   *
+   * @param userId - Authenticated user id
+   * @param index - Zero-based position in the photos array
+   */
+  async removePhoto(userId: string, index: number) {
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { photos: true },
+    });
+    if (!profile) throw new NotFoundException('Profile not found');
+    if (!Number.isInteger(index) || index < 0 || index >= profile.photos.length) {
+      throw new BadRequestException('Photo index out of range');
+    }
+    const next = profile.photos.filter((_, i) => i !== index);
+    return this.prisma.userProfile.update({
+      where: { userId },
+      data: { photos: next },
+    });
   }
 
   /**
@@ -184,6 +239,26 @@ export class UsersService {
       .from('avatars')
       .getPublicUrl(`${userId}.jpg`);
 
+    return data.publicUrl;
+  }
+
+  /**
+   * Uploads a single gallery photo (separate path so it doesn't collide
+   * with the avatar) and returns its public URL. Filename is randomized so
+   * multiple uploads can coexist.
+   */
+  private async uploadPhoto(userId: string, dataUri: string): Promise<string> {
+    const base64 = dataUri.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64, 'base64');
+    const path   = `photos/${userId}/${randomUUID()}.jpg`;
+
+    const { error } = await this.storage
+      .from('avatars')
+      .upload(path, buffer, { contentType: 'image/jpeg', upsert: false });
+
+    if (error) throw new Error(`Photo upload failed: ${error.message}`);
+
+    const { data } = this.storage.from('avatars').getPublicUrl(path);
     return data.publicUrl;
   }
 }

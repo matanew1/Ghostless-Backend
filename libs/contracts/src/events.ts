@@ -40,6 +40,14 @@ export interface UserZoneChangedEvent {
   previousZone: Zone;
 }
 
+/** Payload for {@link KafkaTopics.INTEREST_EXPRESSED}. */
+export interface InterestExpressedEvent {
+  fromUserId: string;
+  toUserId: string;
+  /** ISO-8601 timestamp. */
+  expressedAt: string;
+}
+
 /** Payload for {@link KafkaTopics.USER_INACTIVE} (future). */
 export interface UserInactiveEvent {
   userId: string;

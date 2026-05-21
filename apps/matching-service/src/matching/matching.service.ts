@@ -5,7 +5,7 @@
 
 import { Inject, Injectable } from '@nestjs/common';
 import { PrismaService } from '@ghostless/database';
-import { KafkaTopics, MatchCreatedEvent, Zone } from '@ghostless/contracts';
+import { InterestExpressedEvent, KafkaTopics, MatchCreatedEvent, Zone } from '@ghostless/contracts';
 import { EVENT_BUS, IEventBus } from '@ghostless/kafka';
 import { ZoneCompatibilityMatrix } from '../zone/zone-compatibility.matrix';
 
@@ -86,16 +86,22 @@ export class MatchingService {
 
     const scored: Array<{ userId: string; score: number; zone: Zone; displayName: string | null; avatarUrl: string | null }> = [];
 
+    // UNMAPPED users haven't earned a zone yet — show them the full pool so they
+    // can accumulate enough interactions to get classified. Everyone else sees
+    // only candidates in the same zone.
+    const strictZoneFilter = myZone !== Zone.UNMAPPED;
+
     for (const c of candidates) {
       if (excluded.has(c.userId)) continue;
       const theirMetrics = await this.prisma.userMetrics.findUnique({
         where: { userId: c.userId },
       });
       const theirZone = (theirMetrics?.zone as Zone) ?? Zone.UNMAPPED;
-      const alignment = this.matrix.getScore(myZone, theirZone);
-      // Skip low-alignment candidates only when we already have enough results
-      if (alignment < MIN_ALIGNMENT && scored.length >= limit) continue;
 
+      // Hard zone match: skip anyone not in my zone (UNMAPPED callers are exempt).
+      if (strictZoneFilter && theirZone !== myZone) continue;
+
+      const alignment = this.matrix.getScore(myZone, theirZone);
       const interestSim = this.jaccard(myTags, new Set(c.tags));
       const velocityMatch =
         1 -
@@ -132,6 +138,13 @@ export class MatchingService {
       create: { fromUserId, toUserId, interested: true },
       update: { interested: true },
     });
+
+    const event: InterestExpressedEvent = {
+      fromUserId,
+      toUserId,
+      expressedAt: new Date().toISOString(),
+    };
+    await this.eventBus.publish(KafkaTopics.INTEREST_EXPRESSED, fromUserId, event);
 
     const mutual = await this.prisma.matchInterest.findUnique({
       where: {

@@ -5,10 +5,11 @@
 
 import { Inject, Injectable, OnModuleInit } from '@nestjs/common';
 import {
+  InterestExpressedEvent,
   KafkaTopics,
+  MatchCreatedEvent,
   MessageReadEvent,
   MessageSentEvent,
-  MatchCreatedEvent,
 } from '@ghostless/contracts';
 import { EVENT_CONSUMER, IEventConsumer } from '@ghostless/kafka';
 import { ScoringService } from '../scoring/scoring.service';
@@ -61,6 +62,16 @@ export class MessageEventsConsumer implements OnModuleInit {
           });
           await this.enqueuer.enqueue(userId);
         }
+      },
+    );
+
+    // Interest actions are engagement signals: enqueue a recalc for the actor
+    // so any zone-affecting metric changes (e.g. activity rate) propagate immediately.
+    await this.consumer.subscribe<InterestExpressedEvent>(
+      KafkaTopics.INTEREST_EXPRESSED,
+      'scoring-service-interests',
+      async (e) => {
+        await this.enqueuer.enqueue(e.fromUserId);
       },
     );
   }

@@ -16,6 +16,8 @@ export const KafkaTopics = {
   MATCH_CREATED: 'ghostless.match.created',
   /** Emitted after soft zone transition completes. */
   USER_ZONE_CHANGED: 'ghostless.user.zone.changed',
+  /** Emitted when a user expresses interest (like) toward another user. */
+  INTEREST_EXPRESSED: 'ghostless.user.interest',
   /** Reserved for future inactivity signals. */
   USER_INACTIVE: 'ghostless.user.inactive',
 } as const;
