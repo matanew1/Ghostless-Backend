@@ -3,9 +3,10 @@
  * @module @ghostless/auth-service
  */
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { createHash, randomBytes } from 'crypto';
+import * as bcrypt from 'bcrypt';
 import { PrismaService } from '@ghostless/database';
 import { OAuthProviderDto } from '../dto/oauth.dto';
 import { OAuthVerifierService, VerifiedOAuthUser } from './oauth-verifier.service';
@@ -72,6 +73,35 @@ export class AuthService {
   async logout(refreshToken: string): Promise<void> {
     const hash = this.hashToken(refreshToken);
     await this.prisma.refreshToken.deleteMany({ where: { tokenHash: hash } });
+  }
+
+  /**
+   * Creates a new email/password account and returns a token pair.
+   * Throws {@link ConflictException} if the email is already taken.
+   */
+  async register(email: string, password: string): Promise<TokenPair> {
+    const existing = await this.prisma.user.findUnique({ where: { email } });
+    if (existing) throw new ConflictException('Email is already in use');
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await this.prisma.user.create({ data: { email, passwordHash } });
+    const profile = await this.ensureProfileAndMetrics(user.id);
+    return this.issueTokens(user.id, email, profile.onboardingComplete);
+  }
+
+  /**
+   * Validates an email/password pair and returns a token pair.
+   * Throws {@link UnauthorizedException} on bad credentials.
+   */
+  async loginWithEmail(email: string, password: string): Promise<TokenPair> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user?.passwordHash) throw new UnauthorizedException('Invalid credentials');
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) throw new UnauthorizedException('Invalid credentials');
+
+    const profile = await this.ensureProfileAndMetrics(user.id);
+    return this.issueTokens(user.id, email, profile.onboardingComplete);
   }
 
   /** Upserts user by Google subject id from verified claims. */

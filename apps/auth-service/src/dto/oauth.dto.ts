@@ -4,7 +4,7 @@
  */
 
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsString } from 'class-validator';
+import { IsEmail, IsEnum, IsString, MinLength } from 'class-validator';
 
 /** Supported OAuth identity providers. */
 export enum OAuthProviderDto {
@@ -27,4 +27,27 @@ export class RefreshTokenDto {
   @ApiProperty()
   @IsString()
   refreshToken!: string;
+}
+
+/** Body for `POST /auth/register`. */
+export class EmailRegisterDto {
+  @ApiProperty({ description: 'User email address' })
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty({ description: 'Password (min 8 characters)' })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+/** Body for `POST /auth/login`. */
+export class EmailLoginDto {
+  @ApiProperty()
+  @IsEmail()
+  email!: string;
+
+  @ApiProperty()
+  @IsString()
+  password!: string;
 }

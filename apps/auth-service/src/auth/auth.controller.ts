@@ -6,7 +6,7 @@
 import { Body, Controller, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { OAuthLoginDto, RefreshTokenDto } from '../dto/oauth.dto';
+import { EmailLoginDto, EmailRegisterDto, OAuthLoginDto, RefreshTokenDto } from '../dto/oauth.dto';
 
 /** Public auth API mounted at `/auth`. */
 @ApiTags('auth')
@@ -23,6 +23,28 @@ export class AuthController {
   @ApiOperation({ summary: 'OAuth login with Google ID token' })
   async oauth(@Body() dto: OAuthLoginDto) {
     return this.authService.loginWithOAuth(dto.provider, dto.idToken);
+  }
+
+  /**
+   * Registers a new account with email and password.
+   *
+   * @param dto - Email and password payload
+   */
+  @Post('register')
+  @ApiOperation({ summary: 'Register with email and password' })
+  async register(@Body() dto: EmailRegisterDto) {
+    return this.authService.register(dto.email, dto.password);
+  }
+
+  /**
+   * Signs in an existing email/password account.
+   *
+   * @param dto - Email and password payload
+   */
+  @Post('login')
+  @ApiOperation({ summary: 'Sign in with email and password' })
+  async login(@Body() dto: EmailLoginDto) {
+    return this.authService.loginWithEmail(dto.email, dto.password);
   }
 
   /**
