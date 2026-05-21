@@ -76,8 +76,18 @@ export class UsersService {
    * @param dto - Onboarding payload
    */
   async completeOnboarding(userId: string, dto: OnboardingDto) {
+    if (dto.dateOfBirth) {
+      const dob   = new Date(dto.dateOfBirth);
+      const today = new Date();
+      const age   = today.getFullYear() - dob.getFullYear()
+        - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+      if (age < 18) throw new BadRequestException('You must be at least 18 years old.');
+    }
+
     await this.prisma.user.upsert({ where: { id: userId }, create: { id: userId }, update: {} });
     await this.prisma.userMetrics.upsert({ where: { userId }, create: { userId }, update: {} });
+
+    const dob = dto.dateOfBirth ? new Date(dto.dateOfBirth) : undefined;
 
     return this.prisma.userProfile.upsert({
       where: { userId },
@@ -85,6 +95,7 @@ export class UsersService {
         userId,
         displayName: dto.displayName,
         bio: dto.bio,
+        dateOfBirth: dob,
         pacePreference: dto.pacePreference,
         gender: dto.gender,
         seekingGenders: dto.seekingGenders,
@@ -94,6 +105,7 @@ export class UsersService {
       update: {
         displayName: dto.displayName,
         bio: dto.bio,
+        ...(dob !== undefined && { dateOfBirth: dob }),
         pacePreference: dto.pacePreference,
         gender: dto.gender,
         seekingGenders: dto.seekingGenders,
@@ -131,6 +143,7 @@ export class UsersService {
         tags: true,
         pacePreference: true,
         gender: true,
+        dateOfBirth: true,
       },
     });
     if (!profile) throw new NotFoundException('Profile not found');
@@ -140,7 +153,18 @@ export class UsersService {
       select: { zone: true },
     });
 
-    return { ...profile, zone: metrics?.zone ?? null };
+    // Expose computed age, not the raw birth date, for privacy.
+    const age = profile.dateOfBirth
+      ? (() => {
+          const dob   = profile.dateOfBirth;
+          const today = new Date();
+          return today.getFullYear() - dob.getFullYear()
+            - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+        })()
+      : null;
+
+    const { dateOfBirth: _dob, ...rest } = profile;
+    return { ...rest, age, zone: metrics?.zone ?? null };
   }
 
   /**

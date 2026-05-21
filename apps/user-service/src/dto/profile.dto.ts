@@ -4,7 +4,7 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsOptional, IsString } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsDateString, IsEnum, IsOptional, IsString } from 'class-validator';
 import { Gender, PacePreference } from '@ghostless/database';
 
 /** Maximum number of additional gallery photos per user (avatar excluded). */
@@ -72,6 +72,11 @@ export class OnboardingDto {
   @ApiProperty()
   @IsString()
   displayName!: string;
+
+  @ApiPropertyOptional({ description: 'ISO 8601 date string — user must be 18+.' })
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
 
   @ApiProperty({ enum: PacePreference })
   @IsEnum(PacePreference)
