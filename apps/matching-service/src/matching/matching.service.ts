@@ -9,8 +9,13 @@ import { InterestExpressedEvent, KafkaTopics, MatchCreatedEvent, Zone } from '@g
 import { EVENT_BUS, IEventBus } from '@ghostless/kafka';
 import { ZoneCompatibilityMatrix } from '../zone/zone-compatibility.matrix';
 
-/** Minimum zone alignment score to include a candidate when the list is full. */
-const MIN_ALIGNMENT = 0.3;
+/**
+ * Minimum zone alignment score to admit a candidate.
+ * Adjacent zones (e.g. CHILL↔STEADY=0.8, CHILL↔GHOST_TOWN=0.7) pass.
+ * Non-adjacent zones (e.g. CHILL↔SPARK=0.2, GHOST_TOWN↔PULSE=0.1) are cut.
+ * This prevents dead-end silos while keeping incompatible extremes apart.
+ */
+const MIN_ALIGNMENT = 0.5;
 
 /**
  * Ranks onboarding-complete users for discovery and manages match lifecycle.
@@ -35,12 +40,12 @@ export class MatchingService {
     this.zoneCache.set(userId, zone);
   }
 
-  /** Resolves zone from cache or `userMetrics`, defaulting to UNMAPPED. */
+  /** Resolves zone from cache or `userMetrics`, defaulting to STEADY. */
   private async getZone(userId: string): Promise<Zone> {
     const cached = this.zoneCache.get(userId);
     if (cached) return cached;
     const metrics = await this.prisma.userMetrics.findUnique({ where: { userId } });
-    const zone = (metrics?.zone as Zone) ?? Zone.UNMAPPED;
+    const zone = (metrics?.zone as Zone) ?? Zone.STEADY;
     this.zoneCache.set(userId, zone);
     return zone;
   }
@@ -54,7 +59,7 @@ export class MatchingService {
   async discovery(userId: string, limit = 20) {
     const me = await this.prisma.userProfile.findUnique({ where: { userId } });
     const myMetrics = await this.prisma.userMetrics.findUnique({ where: { userId } });
-    const myZone = (myMetrics?.zone as Zone) ?? Zone.UNMAPPED;
+    const myZone = (myMetrics?.zone as Zone) ?? Zone.STEADY;
     const myTags = new Set(me?.tags ?? []);
 
     // Discovery requires the caller to have set both gender and seekingGenders
@@ -86,30 +91,41 @@ export class MatchingService {
 
     const scored: Array<{ userId: string; score: number; zone: Zone; displayName: string | null; avatarUrl: string | null }> = [];
 
-    // UNMAPPED users haven't earned a zone yet — show them the full pool so they
-    // can accumulate enough interactions to get classified. Everyone else sees
-    // only candidates in the same zone.
-    const strictZoneFilter = myZone !== Zone.UNMAPPED;
-
     for (const c of candidates) {
       if (excluded.has(c.userId)) continue;
       const theirMetrics = await this.prisma.userMetrics.findUnique({
         where: { userId: c.userId },
       });
-      const theirZone = (theirMetrics?.zone as Zone) ?? Zone.UNMAPPED;
+      const theirZone = (theirMetrics?.zone as Zone) ?? Zone.STEADY;
 
-      // Hard zone match: skip anyone not in my zone (UNMAPPED callers are exempt).
-      if (strictZoneFilter && theirZone !== myZone) continue;
-
+      // Soft zone gate: only admit candidates with sufficient zone compatibility.
+      // Adjacent zones (CHILL↔STEADY=0.8) pass; polar opposites (GHOST_TOWN↔SPARK=0.0) don't.
+      // This replaces the old hard same-zone-only filter which created dead-end silos.
       const alignment = this.matrix.getScore(myZone, theirZone);
-      const interestSim = this.jaccard(myTags, new Set(c.tags));
-      const velocityMatch =
-        1 -
-        Math.abs((myMetrics?.rts ?? 0.5) - (theirMetrics?.rts ?? 0.5));
-      const ghostPenalty = Math.max(myMetrics?.gi ?? 0, theirMetrics?.gi ?? 0);
+      if (alignment < MIN_ALIGNMENT) continue;
 
-      const score =
-        interestSim + alignment + velocityMatch - ghostPenalty;
+      const myGI    = myMetrics?.gi ?? 0;
+      const theirGI = theirMetrics?.gi ?? 0;
+
+      // Hard ghost-compatibility gate: protect non-ghosters from serial ghosters.
+      // A GI gap > 0.5 means one party is reliable and the other chronically ghosts —
+      // pairing them creates a bad experience for both.
+      const ghostGap = Math.abs(myGI - theirGI);
+      if (ghostGap > 0.5) continue;
+
+      const interestSim   = this.jaccard(myTags, new Set(c.tags));
+      const velocityMatch = 1 - Math.abs((myMetrics?.rts ?? 0.5) - (theirMetrics?.rts ?? 0.5));
+
+      // Ghost penalty: absolute GI level hurts the score, asymmetry hurts even more.
+      // Two ghosters matching each other get a base penalty but not the asymmetry hit.
+      const ghostPenalty  = Math.max(myGI, theirGI) * 0.4 + ghostGap * 1.0;
+
+      // Final composite (higher = better match):
+      //   interestSim   (0–1)  — shared tag overlap
+      //   alignment     (0–1)  — zone compatibility
+      //   velocityMatch (0–1)  — similar response pace
+      //   ghostPenalty  (0–1)  — chronic ghosting pulls the score down
+      const score = interestSim + alignment + velocityMatch - ghostPenalty;
 
       scored.push({ userId: c.userId, score, zone: theirZone, displayName: c.displayName ?? null, avatarUrl: c.avatarUrl ?? null });
     }
@@ -169,8 +185,8 @@ export class MatchingService {
     const metricsA = await this.prisma.userMetrics.findUnique({ where: { userId: a } });
     const metricsB = await this.prisma.userMetrics.findUnique({ where: { userId: b } });
     const alignment = this.matrix.getScore(
-      (metricsA?.zone as Zone) ?? Zone.UNMAPPED,
-      (metricsB?.zone as Zone) ?? Zone.UNMAPPED,
+      (metricsA?.zone as Zone) ?? Zone.STEADY,
+      (metricsB?.zone as Zone) ?? Zone.STEADY,
     );
     const score =
       alignment +

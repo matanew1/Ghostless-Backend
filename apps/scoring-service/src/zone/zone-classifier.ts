@@ -8,8 +8,9 @@ import { Zone } from '@ghostless/contracts';
 import { IZoneClassifier, MetricsInput } from './zone-classifier.interface';
 
 /**
- * Assigns a {@link Zone} from RTS/EDS/GI/reciprocity thresholds;
- * returns UNMAPPED until minimum message count is met.
+ * Assigns a {@link Zone} from RTS/EDS/GI/reciprocity thresholds.
+ * New users start at STEADY (the center of the spectrum) until they accumulate
+ * enough messages to be accurately classified.
  */
 @Injectable()
 export class ZoneClassifier implements IZoneClassifier {
@@ -22,7 +23,7 @@ export class ZoneClassifier implements IZoneClassifier {
    */
   classify(metrics: MetricsInput): Zone {
     if (metrics.totalMessages < this.minMessages) {
-      return Zone.UNMAPPED;
+      return Zone.STEADY;
     }
 
     const { rts, eds, gi, reciprocity } = metrics;

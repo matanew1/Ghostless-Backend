@@ -21,11 +21,11 @@ export enum Zone {
 
 /**
  * Maps internal zones to client-visible labels.
- * UNMAPPED is shown as CHILL during onboarding.
+ * UNMAPPED (legacy cold-start state) is shown as STEADY — the center of the spectrum.
  *
  * @param zone - Raw zone from persistence or scoring
  * @returns Zone safe to expose on public APIs
  */
 export function toDisplayZone(zone: Zone): Zone {
-  return zone === Zone.UNMAPPED ? Zone.CHILL : zone;
+  return zone === Zone.UNMAPPED ? Zone.STEADY : zone;
 }
