@@ -49,6 +49,11 @@ export class UpdateProfileDto {
   @IsString()
   avatarData?: string;
 
+  @ApiPropertyOptional({ description: 'ISO 8601 date string — user must be 18+.' })
+  @IsOptional()
+  @IsDateString()
+  dateOfBirth?: string;
+
   @ApiPropertyOptional({
     type: [String],
     description: `Replaces the full additional photos array. Max ${MAX_USER_PHOTOS} URLs.`,

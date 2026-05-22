@@ -89,7 +89,7 @@ export class MatchingService {
     );
     excluded.add(userId);
 
-    const scored: Array<{ userId: string; score: number; zone: Zone; displayName: string | null; avatarUrl: string | null }> = [];
+    const scored: Array<{ userId: string; score: number; zone: Zone; displayName: string | null; avatarUrl: string | null; age: number | null }> = [];
 
     for (const c of candidates) {
       if (excluded.has(c.userId)) continue;
@@ -127,18 +127,28 @@ export class MatchingService {
       //   ghostPenalty  (0–1)  — chronic ghosting pulls the score down
       const score = interestSim + alignment + velocityMatch - ghostPenalty;
 
-      scored.push({ userId: c.userId, score, zone: theirZone, displayName: c.displayName ?? null, avatarUrl: c.avatarUrl ?? null });
+      const age = c.dateOfBirth
+        ? (() => {
+            const dob   = c.dateOfBirth as Date;
+            const today = new Date();
+            return today.getFullYear() - dob.getFullYear()
+              - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+          })()
+        : null;
+
+      scored.push({ userId: c.userId, score, zone: theirZone, displayName: c.displayName ?? null, avatarUrl: c.avatarUrl ?? null, age });
     }
 
     return scored
       .sort((a, b) => b.score - a.score)
       .slice(0, limit)
-      .map(({ userId: id, score, zone, displayName, avatarUrl }) => ({
+      .map(({ userId: id, score, zone, displayName, avatarUrl, age }) => ({
         userId: id,
         score,
         zone,
         displayName,
         avatarUrl,
+        age,
       }));
   }
 

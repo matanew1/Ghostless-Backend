@@ -17,6 +17,8 @@ type BotSeed = {
   avatarImg: number;
   /** Additional gallery photo seeds (picsum.photos seed strings). */
   photoSeeds: string[];
+  /** ISO date string — used to compute age on public profile. */
+  dateOfBirth: string;
   /** If true, this bot gets a pre-seeded interest towards every real (non-bot) user. */
   preliked?: boolean;
 };
@@ -36,6 +38,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.86,
     avatarImg: 1,
     photoSeeds: ['lina-cafe', 'lina-night', 'lina-music'],
+    dateOfBirth: '1998-04-12',
   },
   {
     email: 'maya.bot@ghostless.seed',
@@ -51,6 +54,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.9,
     avatarImg: 5,
     photoSeeds: ['maya-travel', 'maya-food', 'maya-gym'],
+    dateOfBirth: '2001-09-23',
   },
   {
     email: 'noa.bot@ghostless.seed',
@@ -66,6 +70,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.82,
     avatarImg: 9,
     photoSeeds: ['noa-book', 'noa-art', 'noa-kitchen'],
+    dateOfBirth: '1996-11-05',
   },
   {
     email: 'tali.bot@ghostless.seed',
@@ -81,6 +86,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.74,
     avatarImg: 12,
     photoSeeds: ['tali-hike', 'tali-beach', 'tali-city'],
+    dateOfBirth: '1999-02-18',
   },
   {
     email: 'ella.bot@ghostless.seed',
@@ -96,6 +102,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.88,
     avatarImg: 16,
     photoSeeds: ['ella-gaming', 'ella-snacks', 'ella-movies'],
+    dateOfBirth: '2000-07-30',
   },
   {
     email: 'zoe.bot@ghostless.seed',
@@ -111,6 +118,7 @@ const BOT_GIRLS: BotSeed[] = [
     reciprocity: 0.95,
     avatarImg: 20,
     photoSeeds: ['zoe-art', 'zoe-coffee', 'zoe-night'],
+    dateOfBirth: '1997-06-14',
     preliked: true,
   },
 ];
@@ -158,6 +166,8 @@ async function main() {
         },
       });
 
+      const dob = new Date(bot.dateOfBirth);
+
       await prisma.userProfile.upsert({
         where: { userId: user.id },
         create: {
@@ -168,6 +178,7 @@ async function main() {
           pacePreference: bot.pacePreference,
           gender: Gender.FEMALE,
           seekingGenders: [Gender.MALE],
+          dateOfBirth: dob,
           onboardingComplete: true,
           avatarUrl,
           photos,
@@ -179,6 +190,7 @@ async function main() {
           pacePreference: bot.pacePreference,
           gender: Gender.FEMALE,
           seekingGenders: [Gender.MALE],
+          dateOfBirth: dob,
           onboardingComplete: true,
           avatarUrl,
           photos,

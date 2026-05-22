@@ -47,7 +47,7 @@ export class UsersService {
    * @param dto - Fields to update
    */
   async updateProfile(userId: string, dto: UpdateProfileDto) {
-    const { avatarData, photos, ...rest } = dto;
+    const { avatarData, photos, dateOfBirth, ...rest } = dto;
     const data: Record<string, unknown> = { ...rest };
 
     if (avatarData) {
@@ -59,6 +59,15 @@ export class UsersService {
         throw new BadRequestException(`At most ${MAX_USER_PHOTOS} additional photos are allowed.`);
       }
       data.photos = photos;
+    }
+
+    if (dateOfBirth !== undefined) {
+      const dob   = new Date(dateOfBirth);
+      const today = new Date();
+      const age   = today.getFullYear() - dob.getFullYear()
+        - (today < new Date(today.getFullYear(), dob.getMonth(), dob.getDate()) ? 1 : 0);
+      if (age < 18) throw new BadRequestException('You must be at least 18 years old.');
+      data.dateOfBirth = dob;
     }
 
     return this.prisma.userProfile.update({
